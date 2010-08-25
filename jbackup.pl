@@ -215,7 +215,11 @@ sub d {
 }
 
 sub do_sync {
-### ENTRY DOWNLOADING ###
+    sync_entries();
+    sync_comments();
+}
+
+sub sync_entries {
     # see if we have any sync data saved
     my %sync;
     my $lastsync = $bak{"event:lastsync"};
@@ -291,8 +295,9 @@ sub do_sync {
         d("do_sync: got $count items.");
         last unless $count && $lastgrab;
     }
+}
 
-### COMMENT DOWNLOADING ###
+sub sync_comments {
     # see if we shouldn't be doing this
     return if $opts{no_comments};
 
