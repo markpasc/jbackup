@@ -661,7 +661,6 @@ sub do_dump {
 
         my @groups;
         my $groupmask = 0x01;  # skip the 0th bit
-        d(sprintf("\tfriend $id has mask 0b%032b", $friendmask));
         for my $group (1..30) {
             $groupmask <<= 1;
             push @groups, $group
