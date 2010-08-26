@@ -1036,13 +1036,18 @@ sub dump_xml {
     $ret .= "\t<friends>\n";
     for my $friend (values %$friends) {
         $ret .= "\t\t<friend>\n";
-        $ret .= "\t\t\t<username>$friend->{username}</username>\n";
-        $ret .= "\t\t\t<groupmask>$friend->{groupmask}</groupmask>\n";
-        $ret .= "\t\t\t<groups>\n";
-        for my $group (@{ $friend->{groups} }) {
-            $ret .= "\t\t\t\t<group>$group</group>\n";
+        for my $field (qw( username type identity_type identity_value identity_display fgcolor bgcolor birthday groupmask )) {
+            $ret .= "\t\t\t<$field>" . $friend->{$field} . "</$field>\n"
+                if $friend->{$field};
         }
-        $ret .= "\t\t\t</groups>\n";
+        my $groups = $friend->{groups};
+        if (@$groups){
+            $ret .= "\t\t\t<groups>\n";
+            for my $group (@$groups) {
+                $ret .= "\t\t\t\t<group>$group</group>\n";
+            }
+            $ret .= "\t\t\t</groups>\n";
+        }
         $ret .= "\t\t</friend>\n";
     }
     for my $group (values %$friendgroups) {
