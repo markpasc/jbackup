@@ -91,7 +91,7 @@ exit 1 unless
                "md5pass=s" => \$opts{md5password},
                "alter-security=s" => \$opts{alter_security},
                "confirm-alter" => \$opts{confirm_alter},
-               "no-friendgroups" => \$opts{no_friendgroups},
+               "no-friends" => \$opts{no_friends},
                "no-events" => \$opts{no_events},
                "no-comments" => \$opts{no_comments},);
 
@@ -137,11 +137,11 @@ jbackup.pl -- journal database generator and formatter
     --config=X      Specify a configuration file other than ~/.jbackup.
 
   Data update options:
-    --sync              Update or create the database.
-    --no-comments       Do not update comment information.  (Much faster.)
-    --no-events         Do not update event information.  (Not much useful.)
-    --no-friendgroups   Do not update friend group information.  (Tasty.)
-    --dbpath=X          Store sync database in this directory.
+    --sync          Update or create the database.
+    --no-comments   Do not update comment information.  (Much faster.)
+    --no-events     Do not update event information.  (Not much useful.)
+    --no-friends    Do not update friends information.  (Tasty.)
+    --dbpath=X      Store sync database in this directory.
 
   Journal modification options:
     --alter-security=X  Change the security setting of your public entries.
@@ -221,7 +221,7 @@ sub d {
 sub do_sync {
     sync_events();
     sync_comments();
-    sync_friendgroups();
+    sync_friends();
 }
 
 sub sync_events {
@@ -428,8 +428,8 @@ sub sync_comments {
     $bak{"comment:lastid"} = $lastid if $count;
 }
 
-sub sync_friendgroups {
-    return if $opts{no_friendgroups};
+sub sync_friends {
+    return if $opts{no_friends};
 
     my $count = 0;
     my $hash = call_xmlrpc('getfriendgroups', { ver => 1 });
@@ -524,22 +524,22 @@ sub save_friendgroup {
     FIELD: for my $field (qw( name sortorder public )) {
         next FIELD if !$group->{$field};
         my $tmp = pack('C*', unpack('C*', $group->{$field}));
-        $bak{"friendgroup:$field:$id"} = $tmp;
+        $bak{"friends:group:$field:$id"} = $tmp;
     }
 }
 
 sub load_friendgroup {
     my ($id) = @_;
 
-    my $name = $bak{"friendgroup:name:$id"};
+    my $name = $bak{"friends:group:name:$id"};
     # That means there is (or isn't) one.
     return {} if !$name;
 
     return {
         id        => $id,
         name      => $name,
-        sortorder => $bak{"friendgroup:sortorder:$id"},
-        public    => $bak{"friendgroup:public:$id"},
+        sortorder => $bak{"friends:group:sortorder:$id"},
+        public    => $bak{"friends:group:public:$id"},
     };
 }
 
@@ -956,7 +956,7 @@ sub dump_xml {
 
     $ret .= "\t</events>\n";
 
-    $ret .= "\t<friendgroups>\n";
+    $ret .= "\t<friends>\n";
     for my $group (@$friendgroups) {
         $ret .= "\t\t<group>\n";
         $ret .= "\t\t\t<id>$group->{id}</id>\n";
@@ -965,7 +965,7 @@ sub dump_xml {
         $ret .= "\t\t\t<public>$group->{public}</public>\n" if $group->{public};
         $ret .= "\t\t</group>\n";
     }
-    $ret .= "\t</friendgroups>\n";
+    $ret .= "\t</friends>\n";
 
     # close out, we're done
     $ret .= "</livejournal>\n";
