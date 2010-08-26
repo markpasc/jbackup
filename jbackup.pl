@@ -91,6 +91,8 @@ exit 1 unless
                "md5pass=s" => \$opts{md5password},
                "alter-security=s" => \$opts{alter_security},
                "confirm-alter" => \$opts{confirm_alter},
+               "no-friendgroups" => \$opts{no_friendgroups},
+               "no-events" => \$opts{no_events},
                "no-comments" => \$opts{no_comments},);
 
 # hit up .jbackup for other options
@@ -135,9 +137,11 @@ jbackup.pl -- journal database generator and formatter
     --config=X      Specify a configuration file other than ~/.jbackup.
 
   Data update options:
-    --sync          Update or create the database.
-    --no-comments   Do not update comment information.  (Much faster.)
-    --dbpath=X      Store sync database in this directory.
+    --sync              Update or create the database.
+    --no-comments       Do not update comment information.  (Much faster.)
+    --no-events         Do not update event information.  (Not much useful.)
+    --no-friendgroups   Do not update friend group information.  (Tasty.)
+    --dbpath=X          Store sync database in this directory.
 
   Journal modification options:
     --alter-security=X  Change the security setting of your public entries.
@@ -215,11 +219,14 @@ sub d {
 }
 
 sub do_sync {
-    sync_entries();
+    sync_events();
     sync_comments();
+    sync_friendgroups();
 }
 
-sub sync_entries {
+sub sync_events {
+    return if $opts{no_events};
+
     # see if we have any sync data saved
     my %sync;
     my $lastsync = $bak{"event:lastsync"};
@@ -421,6 +428,19 @@ sub sync_comments {
     $bak{"comment:lastid"} = $lastid if $count;
 }
 
+sub sync_friendgroups {
+    return if $opts{no_friendgroups};
+
+    my $count = 0;
+    my $hash = call_xmlrpc('getfriendgroups', { ver => 1 });
+
+    foreach my $group (@{$hash->{friendgroups} || []}) {
+        # got a group
+        $count++;
+        save_friendgroup($group);
+    }
+}
+
 # save an event that we get
 sub save_event {
     my $data = shift;
@@ -495,6 +515,28 @@ sub load_comment {
         parentid => $data[3]+0,
     );
     return \%hash;
+}
+
+sub save_friendgroup {
+    my ($group) = @_;
+
+    my $id = $group->{id};
+    FIELD: for my $field (qw( name sortorder public )) {
+        next FIELD if !$group->{$field};
+        my $tmp = pack('C*', unpack('C*', $group->{$field}));
+        $bak{"friendgroup:$field:$id"} = $tmp;
+    }
+}
+
+sub load_friendgroup {
+    my ($id) = @_;
+
+    return {
+        id        => $id,
+        name      => $bak{"friendgroup:name:$id"},
+        sortorder => $bak{"friendgroup:sortorder:$id"},
+        public    => $bak{"friendgroup:public:$id"},
+    };
 }
 
 sub do_authed_fetch {
