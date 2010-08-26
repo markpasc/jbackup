@@ -534,18 +534,18 @@ sub save_friend {
     FIELD: for my $field (qw( username fullname identity_type identity_value identity_display type birthday fgcolor bgcolor groupmask )) {
         next FIELD if !$friend->{$field};
         my $tmp = pack('C*', unpack('C*', $friend->{$field}));
-        $bak{"friend:$id:$field"} = $tmp;
+        $bak{"friend:$field:$id"} = $tmp;
     }
 }
 
 sub load_friend {
     my ($id) = @_;
 
-    my $username = $bak{"friend:$id:username"};
+    my $username = $bak{"friend:username:$id"};
     return {} if !$username;
 
     my %friend = map {
-        $_ => $bak{"friend:$id:$_"},
+        $_ => $bak{"friend:$_:$id"},
     } (qw( username fullname identity_type identity_value identity_display type birthday fgcolor bgcolor groupmask ));
     return \%friend;
 }
