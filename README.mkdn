@@ -32,6 +32,8 @@ Usage
       Data update options:
         --sync          Update or create the database.
         --no-comments   Do not update comment information.  (Much faster.)
+        --no-events     Do not update event information.  (Not much useful.)
+        --no-friends    Do not update friends information.  (Tasty.)
         --dbpath=X      Store sync database in this directory.
     
       Journal modification options:
