@@ -684,7 +684,7 @@ sub do_dump {
     my $content = ({html => \&dump_html, xml => \&dump_xml}->{$dt} || \&dump_invalid)->(\%data, \%usermap, \%events, \%friends, \%friendgroups);
     if ($opts{file}) {
         # open file and print
-        open FILE, ">$opts{file}"
+        open FILE, ">", $opts{file}
             or die "do_dump: unable to open file: $!\n";
         print FILE $content;
         close FILE;
