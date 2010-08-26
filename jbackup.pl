@@ -531,9 +531,13 @@ sub save_friendgroup {
 sub load_friendgroup {
     my ($id) = @_;
 
+    my $name = $bak{"friendgroup:name:$id"};
+    # That means there is (or isn't) one.
+    return {} if !$name;
+
     return {
         id        => $id,
-        name      => $bak{"friendgroup:name:$id"},
+        name      => $name,
         sortorder => $bak{"friendgroup:sortorder:$id"},
         public    => $bak{"friendgroup:public:$id"},
     };
@@ -590,10 +594,18 @@ sub do_dump {
                                $events{$id}->{security} && $events{$id}->{security} ne 'public';
     }
 
+    d("do_dump: loading friendgroups");
+    my @friendgroups;
+    GROUP: for my $id (1..30) {
+        my $group = load_friendgroup($id);
+        push @friendgroups, $group
+            if %$group;
+    }
+
     # and now, the wild and crazy 'dump this' handler ... in case you can't tell, it just
     # dispatches to the appropriate dumper, and if an invalid dump type is specified, it
     # tells the user they can't do that
-    my $content = ({html => \&dump_html, xml => \&dump_xml}->{$dt} || \&dump_invalid)->(\%data, \%usermap, \%events);
+    my $content = ({html => \&dump_html, xml => \&dump_xml}->{$dt} || \&dump_invalid)->(\%data, \%usermap, \%events, \@friendgroups);
     if ($opts{file}) {
         # open file and print
         open FILE, ">$opts{file}"
@@ -863,7 +875,7 @@ sub dump_html {
 }
 
 sub dump_xml {
-    my ($comments, $users, $events) = @_;
+    my ($comments, $users, $events, $friendgroups) = @_;
     d("dump_xml: dumping.");
 
     # comment dumper
@@ -942,8 +954,21 @@ sub dump_xml {
     }
     d("100.00% ..."); # spit and polish
 
+    $ret .= "\t</events>\n";
+
+    $ret .= "\t<friendgroups>\n";
+    for my $group (@$friendgroups) {
+        $ret .= "\t\t<group>\n";
+        $ret .= "\t\t\t<id>$group->{id}</id>\n";
+        $ret .= "\t\t\t<name>$group->{name}</name>\n";
+        $ret .= "\t\t\t<sortorder>$group->{sortorder}</sortorder>\n";
+        $ret .= "\t\t\t<public>$group->{public}</public>\n" if $group->{public};
+        $ret .= "\t\t</group>\n";
+    }
+    $ret .= "\t</friendgroups>\n";
+
     # close out, we're done
-    $ret .= "\t</events>\n</livejournal>\n";
+    $ret .= "</livejournal>\n";
     d("dump_xml: done.");
     return $ret;
 }
