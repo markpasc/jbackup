@@ -632,20 +632,34 @@ sub do_dump {
     @ids = split q{,}, $bak{"friends:ids"};
     FRIEND: for my $id (@ids) {
         $friends{$id} = load_friend($id);
+
+        my $friendmask = $friends{$id}->{groupmask};
+        $friendmask &= 0xFE;
+
+        my @groups;
+        my $groupmask = 0x01;  # skip the 0th bit
+        d(sprintf("\tfriend $id has mask 0b%032b", $friendmask));
+        for my $group (1..30) {
+            $groupmask <<= 1;
+            push @groups, $group
+                if $friendmask & $groupmask;
+        }
+
+        $friends{$id}->{groups} = \@groups;
     }
 
     d("do_dump: loading friendgroups");
-    my @friendgroups;
+    my %friendgroups;
     GROUP: for my $id (1..30) {
         my $group = load_friendgroup($id);
-        push @friendgroups, $group
+        $friendgroups{$id} = $group
             if %$group;
     }
 
     # and now, the wild and crazy 'dump this' handler ... in case you can't tell, it just
     # dispatches to the appropriate dumper, and if an invalid dump type is specified, it
     # tells the user they can't do that
-    my $content = ({html => \&dump_html, xml => \&dump_xml}->{$dt} || \&dump_invalid)->(\%data, \%usermap, \%events, \%friends, \@friendgroups);
+    my $content = ({html => \&dump_html, xml => \&dump_xml}->{$dt} || \&dump_invalid)->(\%data, \%usermap, \%events, \%friends, \%friendgroups);
     if ($opts{file}) {
         # open file and print
         open FILE, ">$opts{file}"
@@ -1001,9 +1015,14 @@ sub dump_xml {
         $ret .= "\t\t<friend>\n";
         $ret .= "\t\t\t<username>$friend->{username}</username>\n";
         $ret .= "\t\t\t<groupmask>$friend->{groupmask}</groupmask>\n";
+        $ret .= "\t\t\t<groups>\n";
+        for my $group (@{ $friend->{groups} }) {
+            $ret .= "\t\t\t\t<group>$group</group>\n";
+        }
+        $ret .= "\t\t\t</groups>\n";
         $ret .= "\t\t</friend>\n";
     }
-    for my $group (@$friendgroups) {
+    for my $group (values %$friendgroups) {
         $ret .= "\t\t<group>\n";
         $ret .= "\t\t\t<id>$group->{id}</id>\n";
         $ret .= "\t\t\t<name>$group->{name}</name>\n";
