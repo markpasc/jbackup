@@ -431,12 +431,21 @@ sub sync_comments {
 sub sync_friends {
     return if $opts{no_friends};
 
-    my $count = 0;
-    my $hash = call_xmlrpc('getfriendgroups', { ver => 1 });
+    my $hash = call_xmlrpc('getfriends', {
+        ver => 1,
+        includefriendof => 0,
+        includegroups => 1,
+        includebdays => 1,
+    });
 
-    foreach my $group (@{$hash->{friendgroups} || []}) {
-        # got a group
-        $count++;
+    my @friend_ids;
+    for my $friend (@{$hash->{friends} || []}) {
+        push @friend_ids, $friend->{username};
+        save_friend($friend);
+    }
+    $bak{"friends:ids"} = join(q{,}, @friend_ids);
+
+    for my $group (@{$hash->{friendgroups} || []}) {
         save_friendgroup($group);
     }
 }
@@ -517,6 +526,30 @@ sub load_comment {
     return \%hash;
 }
 
+sub save_friend {
+    my ($friend) = @_;
+
+    # We don't get a stable identifier back, so use the username I guess.
+    my $id = $friend->{username};
+    FIELD: for my $field (qw( username fullname identity_type identity_value identity_display type birthday fgcolor bgcolor groupmask )) {
+        next FIELD if !$friend->{$field};
+        my $tmp = pack('C*', unpack('C*', $friend->{$field}));
+        $bak{"friend:$id:$field"} = $tmp;
+    }
+}
+
+sub load_friend {
+    my ($id) = @_;
+
+    my $username = $bak{"friend:$id:username"};
+    return {} if !$username;
+
+    my %friend = map {
+        $_ => $bak{"friend:$id:$_"},
+    } (qw( username fullname identity_type identity_value identity_display type birthday fgcolor bgcolor groupmask ));
+    return \%friend;
+}
+
 sub save_friendgroup {
     my ($group) = @_;
 
@@ -594,6 +627,13 @@ sub do_dump {
                                $events{$id}->{security} && $events{$id}->{security} ne 'public';
     }
 
+    d("do_dump: loading friends");
+    my %friends;
+    @ids = split q{,}, $bak{"friends:ids"};
+    FRIEND: for my $id (@ids) {
+        $friends{$id} = load_friend($id);
+    }
+
     d("do_dump: loading friendgroups");
     my @friendgroups;
     GROUP: for my $id (1..30) {
@@ -605,7 +645,7 @@ sub do_dump {
     # and now, the wild and crazy 'dump this' handler ... in case you can't tell, it just
     # dispatches to the appropriate dumper, and if an invalid dump type is specified, it
     # tells the user they can't do that
-    my $content = ({html => \&dump_html, xml => \&dump_xml}->{$dt} || \&dump_invalid)->(\%data, \%usermap, \%events, \@friendgroups);
+    my $content = ({html => \&dump_html, xml => \&dump_xml}->{$dt} || \&dump_invalid)->(\%data, \%usermap, \%events, \%friends, \@friendgroups);
     if ($opts{file}) {
         # open file and print
         open FILE, ">$opts{file}"
@@ -875,7 +915,7 @@ sub dump_html {
 }
 
 sub dump_xml {
-    my ($comments, $users, $events, $friendgroups) = @_;
+    my ($comments, $users, $events, $friends, $friendgroups) = @_;
     d("dump_xml: dumping.");
 
     # comment dumper
@@ -957,6 +997,12 @@ sub dump_xml {
     $ret .= "\t</events>\n";
 
     $ret .= "\t<friends>\n";
+    for my $friend (values %$friends) {
+        $ret .= "\t\t<friend>\n";
+        $ret .= "\t\t\t<username>$friend->{username}</username>\n";
+        $ret .= "\t\t\t<groupmask>$friend->{groupmask}</groupmask>\n";
+        $ret .= "\t\t</friend>\n";
+    }
     for my $group (@$friendgroups) {
         $ret .= "\t\t<group>\n";
         $ret .= "\t\t\t<id>$group->{id}</id>\n";
