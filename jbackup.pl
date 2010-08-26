@@ -443,7 +443,7 @@ sub sync_friends {
         push @friend_ids, $friend->{username};
         save_friend($friend);
     }
-    $bak{"friends:ids"} = join(q{,}, @friend_ids);
+    $bak{"friend:ids"} = join(q{,}, @friend_ids);
 
     for my $group (@{$hash->{friendgroups} || []}) {
         save_friendgroup($group);
@@ -557,22 +557,22 @@ sub save_friendgroup {
     FIELD: for my $field (qw( name sortorder public )) {
         next FIELD if !$group->{$field};
         my $tmp = pack('C*', unpack('C*', $group->{$field}));
-        $bak{"friends:group:$field:$id"} = $tmp;
+        $bak{"friend:group:$field:$id"} = $tmp;
     }
 }
 
 sub load_friendgroup {
     my ($id) = @_;
 
-    my $name = $bak{"friends:group:name:$id"};
+    my $name = $bak{"friend:group:name:$id"};
     # That means there is (or isn't) one.
     return {} if !$name;
 
     return {
         id        => $id,
         name      => $name,
-        sortorder => $bak{"friends:group:sortorder:$id"},
-        public    => $bak{"friends:group:public:$id"},
+        sortorder => $bak{"friend:group:sortorder:$id"},
+        public    => $bak{"friend:group:public:$id"},
     };
 }
 
@@ -629,7 +629,7 @@ sub do_dump {
 
     d("do_dump: loading friends");
     my %friends;
-    @ids = split q{,}, $bak{"friends:ids"};
+    @ids = split q{,}, $bak{"friend:ids"};
     FRIEND: for my $id (@ids) {
         $friends{$id} = load_friend($id);
 
