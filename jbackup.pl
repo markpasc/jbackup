@@ -993,7 +993,9 @@ sub dump_xml {
 
     # dump xml formatted comments
     $ret .= "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
-    $ret .= "<livejournal>\n\t<events>\n";
+    $ret .= "<livejournal server='$opts{server}' username='$opts{user}'>\n";
+
+    $ret .= "\t<events>\n";
 
     # now start iterating
     my $tree = make_tree($comments);
@@ -1036,7 +1038,7 @@ sub dump_xml {
     $ret .= "\t<friends>\n";
     for my $friend (values %$friends) {
         $ret .= "\t\t<friend>\n";
-        for my $field (qw( username type identity_type identity_value identity_display fgcolor bgcolor birthday groupmask )) {
+        for my $field (qw( username fullname type identity_type identity_value identity_display fgcolor bgcolor birthday groupmask )) {
             $ret .= "\t\t\t<$field>" . $friend->{$field} . "</$field>\n"
                 if $friend->{$field};
         }
