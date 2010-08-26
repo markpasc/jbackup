@@ -59,6 +59,29 @@
 # comment:body:<jtalkid>        Text of the comment.  May not be present for deleted comments.
 # comment:date:<jtalkid>        Date of the comment.  In W3C date format.
 #       As with events.  Contains various bits of information about the comments.
+#
+# friend:ids
+#       The usernames of all the recorded friends.  Comma separated.
+#
+# friend:username:<username>
+# friend:fullname:<username>
+# friend:type:<username>                "community", "syndicated", "news", "shared", "identity" (OpenID), or
+#                                       missing/unset for a regular person account.
+# friend:identity_type:<username>       "openid" for OpenID accounts.
+# friend:identity_value:<username>      The OpenID URL for an OpenID account.
+# friend:identity_display:<username>    The display name for an OpenID account.
+# friend:birthday:<username>            The friend's birthday in 'YYYY-mm-dd' format.
+# friend:fgcolor:<username>             The foreground color assigned to the friend as an '#rrggbb' hex color.
+# friend:bgcolor:<username>             The background color assigned to the friend as an '#rrggbb' hex color.
+# friend:groupmask:<username>           Integer representing the bitmask of all the friend groups that friend is in.
+#       Friend data as returned by the LJ.XMLRPC.getfriends() call.
+#
+# friend:group:name:<groupid>         Name of the friends group.
+# friend:group:sortorder:<groupid>    Sort order of the friends group.
+# friend:group:public:<groupid>       Public-ness of the friends group.  Missing for private groups.
+#       Friend group data.  Recall that friend group IDs are numbers 1-30,
+#       corresponding to the bits in the groupmask.
+#
 ###################################################################################################
 
 ## the program ##
