@@ -306,6 +306,7 @@ sub sync_events {
 
         # get newest item we have cached
         my $count = 0;
+        $lastgrab =~ s{ (\d\d) \z }{ sprintf '%02d', ($1 - 3) % 60 }emsx;
         d("do_sync: calling getevents with lastgrab = " . ($lastgrab || 'none yet'));
         my $hash = call_xmlrpc('getevents', { selecttype => 'syncitems',
                                               lastsync => $lastgrab,
@@ -440,6 +441,7 @@ sub sync_comments {
     # at this point we have a fully regenerated metadata cache and we want to grab a block of comments
     while (1) {
         my $content = do_authed_fetch('comment_body', $lastid+1, $COMMENTS_FETCH_BODY, $ljsession);
+        print $content, "\n";
         die "Some sort of error fetching body data from server" unless $content;
 
         # now we want to XML parse this
@@ -1018,7 +1020,7 @@ sub dump_xml {
             if ($props && %$props) {
                 $res .= "\t\t\t\t\t<props>\n";
                 while (my ($name, $value) = each %$props) {
-                    $res .= "\t\t\t\t\t\t<prop name='$name'>$value</property>\n";
+                    $res .= "\t\t\t\t\t\t<prop name='$name'>$value</prop>\n";
                 }
                 $res .= "\t\t\t\t\t</props>\n";
             }
