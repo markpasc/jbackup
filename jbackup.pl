@@ -60,6 +60,12 @@
 # comment:date:<jtalkid>        Date of the comment.  In W3C date format.
 #       As with events.  Contains various bits of information about the comments.
 #
+# comment:proplist:<jtalkid>
+#       List of all properties that are defined for this comment.  Comma separated.
+#
+# comment:prop:<jtalkid>:<property>
+#       Stores the values of the properties.  <property> is taken from the proplist.
+#
 # friend:ids
 #       The usernames of all the recorded friends.  Comma separated.
 #
@@ -344,6 +350,7 @@ sub sync_comments {
     my $server_max_id = 0;
     my $server_next_id = 1;
     my $lasttag = '';
+    my $lastproperty = '';
     my $meta_handler = sub {
         # this sub actually processes incoming meta information
         $lasttag = $_[1];
@@ -407,6 +414,9 @@ sub sync_comments {
             # line below commented out because we shouldn't be trying to be clever like this ;p
             # $lastid = $curid if $curid > $lastid;
         }
+        elsif ($lasttag eq 'property') {
+            $lastproperty = $temp{name};
+        }
     };
     my $body_closer = sub {
         # we hit a closing tag so we're not in a tag anymore
@@ -416,11 +426,15 @@ sub sync_comments {
     my $body_content = sub {
         # this grabs data inside of comments: body, subject, date
         return unless $curid;
-        return unless $lasttag =~ /(?:body|subject|date)/;
-        $meta{$curid}{$lasttag} .= $_[1];
-        # have to .= it, because the parser will split on punctuation such as an apostrophe
-        # that may or may not be in the data stream, and we won't know until we've already
-        # gotten some data
+        if ($lasttag =~ /(?:body|subject|date)/) {
+            # have to .= it, because the parser will split on punctuation such as an apostrophe
+            # that may or may not be in the data stream, and we won't know until we've already
+            # gotten some data
+            $meta{$curid}{$lasttag} .= $_[1];
+        }
+        elsif ($lasttag eq 'property') {
+            $meta{$curid}{props}{$lastproperty} .= $_[1];
+        }
     };
 
     # at this point we have a fully regenerated metadata cache and we want to grab a block of comments
@@ -527,6 +541,16 @@ sub save_comment {
         my $tmp = pack('C*', unpack('C*', $data->{$_}));
         $bak{"comment:$_:$data->{id}"} = $tmp;
     }
+
+    my $props = $data->{props};
+    if ($props && %$props) {
+        my @propnames;
+        while (my ($name, $value) = each %$props) {
+            $bak{"comment:prop:$data->{id}:$name"} = $value;
+            push @propnames, $name;
+        }
+        $bak{"comment:proplist:$data->{id}"} = join q{,}, @propnames;
+    }
 }
 
 # load a comment up into a hash and return the hash
@@ -546,6 +570,14 @@ sub load_comment {
         jitemid => $data[2]+0,
         parentid => $data[3]+0,
     );
+
+    if (my $propnames = $bak{"comment:proplist:$id"} || q{}) {
+        for my $propname (split q{,}, $propnames) {
+            my $tmp = $bak{"comment:prop:$id:$propname"};
+            $hash{props}{$propname} = $tmp if $tmp;
+        }
+    }
+
     return \%hash;
 }
 
@@ -607,7 +639,7 @@ sub do_authed_fetch {
     my $ua = LWP::UserAgent->new;
     $ua->agent('JBackup/1.0');
     my $authas = $opts{usejournal} ? "&authas=$opts{usejournal}" : '';
-    my $request = HTTP::Request->new(GET => "http://$opts{server}/export_comments.bml?get=$mode&startid=$startid&numitems=$numitems$authas");
+    my $request = HTTP::Request->new(GET => "http://$opts{server}/export_comments.bml?get=$mode&startid=$startid&numitems=$numitems&props=1$authas");
     $request->push_header(Cookie => "ljsession=$sess");
     my $response = $ua->request($request);
     return if $response->is_error();
@@ -980,6 +1012,15 @@ sub dump_xml {
                     $data->{$_} = exml($data->{$_});
                     $res .= "\t\t\t\t\t<$_>$data->{$_}</$_>\n" if $data->{$_};
                 }
+            }
+
+            my $props = $data->{props};
+            if ($props && %$props) {
+                $res .= "\t\t\t\t\t<props>\n";
+                while (my ($name, $value) = each %$props) {
+                    $res .= "\t\t\t\t\t\t<prop name='$name'>$value</property>\n";
+                }
+                $res .= "\t\t\t\t\t</props>\n";
             }
 
             # now hit up their children
