@@ -40,9 +40,13 @@
 #
 # usermap:<userid>
 #       For <userid>, contains the username.
-#
 # usermap:userids
 #       All the valid userids.  Same logic as event:ids.
+#
+# usermap:<userid>:userpics
+#       Comma-separated list of user <userid>'s userpic keywords.
+# usermap:<userid>:userpic:<kw>
+#       Binary data of user <userid>'s userpic with keyword <kw>.
 #
 # comment:ids
 #       Should be familiar.  All the valid jtalkids.  Comma separated.
@@ -98,6 +102,8 @@ use Data::Dumper;
 use XMLRPC::Lite;
 use XML::Parser;
 use Digest::MD5 qw(md5_hex);
+use MIME::Base64;
+use List::MoreUtils qw( uniq );
 use Term::ReadKey;
 
 # get options
@@ -167,6 +173,7 @@ jbackup.pl -- journal database generator and formatter
 
   Data update options:
     --sync          Update or create the database.
+    --no-userpics   Do not update userpic information.
     --no-comments   Do not update comment information.  (Much faster.)
     --no-events     Do not update event information.  (Not much useful.)
     --no-friends    Do not update friends information.  (Tasty.)
@@ -248,9 +255,45 @@ sub d {
 }
 
 sub do_sync {
+    sync_userpics();
     sync_events();
     sync_comments();
     sync_friends();
+}
+
+sub sync_userpics {
+    return if $opts{no_userpics};
+
+    my $hash = call_xmlrpc('login', {
+        getpickws => 1,
+        getpickwurls => 1,
+    });
+    my $userid = $hash->{userid};
+
+    my %userpics;
+    @userpics{ @{$hash->{pickws}} } = @{$hash->{pickwurls}};
+
+    # Fetch the real userpics.
+    my $ua = LWP::UserAgent->new;
+    for my $value (values %userpics) {
+        d("Fetching userpic $value");
+        my $resp = $ua->get($value);
+        die "Unexpected HTTP response fetching userpic ${value}: " . $resp->status_line
+            if !$resp->is_success;
+        $value = $resp->decoded_content;
+    }
+
+    # Store it away.
+    my @userids = split(q{,}, $bak{"usermap:userids"} || q{});
+    push @userids, $userid;
+    $bak{"usermap:userids"} = join(q{,}, uniq @userids);
+    d("userids: " . $bak{"usermap:userids"});
+
+    $bak{"usermap:${userid}"} = $opts{user};
+    $bak{"usermap:${userid}:userpics"} = join(q{,}, keys %userpics);
+    for my $kw (keys %userpics) {
+        $bak{"usermap:${userid}:userpic:${kw}"} = $userpics{$kw};
+    }
 }
 
 sub sync_events {
@@ -344,7 +387,7 @@ sub sync_comments {
 
     # downloaded meta data information
     my %meta;
-    my @userids;
+    my @userids = split(q{,}, $bak{"usermap:userids"});
 
     # setup our parsing function
     my $maxid = 0;
@@ -395,7 +438,7 @@ sub sync_comments {
         $parser->parse($content);
     }
     $bak{"comment:ids"} = join ',', keys %meta;
-    $bak{"usermap:userids"} = join ',', @userids;
+    $bak{"usermap:userids"} = join ',', uniq @userids;
 
     # setup our handlers for body XML info
     my $lastid = $bak{"comment:lastid"}+0;
@@ -671,7 +714,15 @@ sub do_dump {
     my %usermap;
     my @userids = split ',', $bak{"usermap:userids"};
     foreach my $id (@userids) {
-        $usermap{$id} = $bak{"usermap:$id"};
+        $usermap{$id} = {
+            name => $bak{"usermap:$id"},
+        };
+        my $userpic_ids = $bak{"usermap:$id:userpics"};
+        if ($userpic_ids) {
+            my @userpic_ids = split q{,}, $userpic_ids;
+            my %userpics = map { $_, $bak{"usermap:$id:userpic:$_"} } @userpic_ids;
+            $usermap{$id}->{userpics} = \%userpics;
+        }
     }
 
     # now let's hit up the events
@@ -1001,7 +1052,10 @@ sub dump_xml {
 
             # we have something to dump, so let's get to it
             $res .= "\t\t\t\t<comment jtalkid='$data->{id}'";
-            $res .= " poster='$users->{$data->{posterid}}' posterid='$data->{posterid}'" if $data->{posterid};
+            if ($data->{posterid}) {
+                my $postername = $users->{ $data->{posterid} }->{name};
+                $res .= " poster='$postername' posterid='$data->{posterid}'";
+            }
             $res .= " parentid='$data->{parentid}'" if $data->{parentid};
             $res .= " state='$data->{state}'" if $data->{state} ne 'A';
             $res .= ">\n";
@@ -1104,6 +1158,22 @@ sub dump_xml {
     }
     $ret .= "\t</friends>\n";
 
+    $ret .= "\t<userpics>\n";
+    for my $userid (keys %$users) {
+        my $userpics = $users->{$userid}->{userpics};
+        if ($userpics && %$userpics) {
+            my $username = $users->{$userid}->{name};
+            $ret .= "\t\t<user username='$username'>\n";
+            for my $kw (keys %$userpics) {
+                $ret .= "\t\t\t<userpic keyword='" . exml($kw) . "'>\n";
+                $ret .= encode_base64($userpics->{$kw});
+                $ret .= "\t\t\t</userpic>\n";
+            }
+            $ret .= "\t\t</user>\n";
+        }
+    }
+    $ret .= "\t</userpics>\n";
+
     # close out, we're done
     $ret .= "</livejournal>\n";
     d("dump_xml: done.");
@@ -1168,14 +1238,14 @@ sub do_flush {
 
 sub do_tie {
     # try to open the database for access
-    d("do_tie: tying database");
+    d("do_tie: tying database $filename");
     my $x = tie %bak, 'DB_File', $filename, O_RDWR| O_CREAT , 0600, $DB_HASH or die "Could not open/tie $filename: $!\n";
     return $x;
 };
 
 sub do_untie {
     # close our database.
-    d("do_untie: untying database");
+    d("do_untie: untying database $filename");
     untie %bak || die "I could not untie the DB: $!";
     return
 };
