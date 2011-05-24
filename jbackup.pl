@@ -99,6 +99,7 @@ use strict;
 use Getopt::Long;
 use DB_File;
 use Data::Dumper;
+use Encode qw( encode );
 use XMLRPC::Lite;
 use XML::Parser;
 use Digest::MD5 qw(md5_hex);
@@ -126,6 +127,7 @@ exit 1 unless
                "md5pass=s" => \$opts{md5password},
                "alter-security=s" => \$opts{alter_security},
                "confirm-alter" => \$opts{confirm_alter},
+               "no-userpics" => \$opts{no_userpics},
                "no-friends" => \$opts{no_friends},
                "no-events" => \$opts{no_events},
                "no-comments" => \$opts{no_comments},);
@@ -484,7 +486,6 @@ sub sync_comments {
     # at this point we have a fully regenerated metadata cache and we want to grab a block of comments
     while (1) {
         my $content = do_authed_fetch('comment_body', $lastid+1, $COMMENTS_FETCH_BODY, $ljsession);
-        print $content, "\n";
         die "Some sort of error fetching body data from server" unless $content;
 
         # now we want to XML parse this
@@ -539,7 +540,7 @@ sub save_event {
     # DO NOT SET REALTIME HERE.  It is set by syncitems.
     foreach (qw(subject anum event eventtime security allowmask poster)) {
         next unless $data->{$_};
-        my $tmp = pack('C*', unpack('C*', $data->{$_}));
+        my $tmp = encode('utf-8', $data->{$_});
         $bak{"event:$_:$id"} = $tmp;
     }
     my @props;
@@ -581,9 +582,10 @@ sub save_comment {
     $bak{"comment:state:$data->{id}"} = "$data->{state}:$data->{posterid}:$data->{jitemid}:$data->{parentid}";
     foreach (qw(subject body date)) {
         next unless $data->{$_};
-        # GDBM doesn't deal with UTF-8, it only wants a string of bytes, so let's do that
-        # by clearing the UTF-8 flag on our input scalars.
-        my $tmp = pack('C*', unpack('C*', $data->{$_}));
+        # GDBM wasn't Unicode aware, so this used a pack/unpack dance that
+        # squashed high characters, so wave this dead chicken to make sure
+        # we store UTF-8 octets in Berkeley DB anyway.
+        my $tmp = encode('utf-8', $data->{$_});
         $bak{"comment:$_:$data->{id}"} = $tmp;
     }
 
@@ -633,7 +635,7 @@ sub save_friend {
     my $id = $friend->{username};
     FIELD: for my $field (qw( username fullname identity_type identity_value identity_display type birthday fgcolor bgcolor groupmask )) {
         next FIELD if !$friend->{$field};
-        my $tmp = pack('C*', unpack('C*', $friend->{$field}));
+        my $tmp = encode('utf-8', $friend->{$field});
         $bak{"friend:$field:$id"} = $tmp;
     }
 }
@@ -656,7 +658,7 @@ sub save_friendgroup {
     my $id = $group->{id};
     FIELD: for my $field (qw( name sortorder public )) {
         next FIELD if !$group->{$field};
-        my $tmp = pack('C*', unpack('C*', $group->{$field}));
+        my $tmp = encode('utf-8', $group->{$field});
         $bak{"friend:group:$field:$id"} = $tmp;
     }
 }
