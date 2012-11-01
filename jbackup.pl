@@ -1076,7 +1076,8 @@ sub dump_xml {
             if ($props && %$props) {
                 $res .= "\t\t\t\t\t<props>\n";
                 while (my ($name, $value) = each %$props) {
-                    $res .= "\t\t\t\t\t\t<prop name='$name'>$value</prop>\n";
+                    my $cleanval = exml($value);
+                    $res .= "\t\t\t\t\t\t<prop name='$name'>$cleanval</prop>\n";
                 }
                 $res .= "\t\t\t\t\t</props>\n";
             }
@@ -1137,7 +1138,7 @@ sub dump_xml {
     for my $friend (values %$friends) {
         $ret .= "\t\t<friend>\n";
         for my $field (qw( username fullname type identity_type identity_value identity_display fgcolor bgcolor birthday groupmask )) {
-            $ret .= "\t\t\t<$field>" . $friend->{$field} . "</$field>\n"
+            $ret .= "\t\t\t<$field>" . exml($friend->{$field}) . "</$field>\n"
                 if $friend->{$field};
         }
         my $groups = $friend->{groups};
@@ -1153,7 +1154,7 @@ sub dump_xml {
     for my $group (values %$friendgroups) {
         $ret .= "\t\t<group>\n";
         $ret .= "\t\t\t<id>$group->{id}</id>\n";
-        $ret .= "\t\t\t<name>$group->{name}</name>\n";
+        $ret .= "\t\t\t<name>" . exml($group->{name}) . "</name>\n";
         $ret .= "\t\t\t<sortorder>$group->{sortorder}</sortorder>\n";
         $ret .= "\t\t\t<public>$group->{public}</public>\n" if $group->{public};
         $ret .= "\t\t</group>\n";
