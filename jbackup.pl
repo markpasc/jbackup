@@ -1016,7 +1016,7 @@ sub dump_html {
         my $link = "http://$opts{server}/users/$opts{linkuser}/$itemid.html";
         $evt->{subject} = $opts{clean} ? clean_subject($evt->{subject}) : ehtml($evt->{subject});
         $ret .= "<b>$evt->{subject}</b>" if $evt->{subject};
-        my $altposter = $evt->{poster} ? " (posted by $evt->{poster})" : "";
+        my $altposter = $evt->{poster} ? " (posted by <a href='http://$opts{server}/userinfo.bml?user=$evt->{poster}'>$evt->{poster}</a>)" : "";
         $ret .= "$altposter<br />\n";
         $ret .= "<a href='$link'>$evt->{eventtime}</a><br /><br />\n";
         $evt->{event} = $opts{clean} ? clean_event($evt->{event}) : ehtml($evt->{event});
