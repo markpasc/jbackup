@@ -545,7 +545,7 @@ sub save_event {
     }
     my @props;
     while (my ($p, $v) = each %{$data->{props} || {}}) {
-        $bak{"event:prop:$id:$p"} = $v;
+        $bak{"event:prop:$id:$p"} = encode('utf-8', $v);
         push @props, $p;
     }
     $bak{"event:proplist:$id"} = join ',', @props; # so we don't have to sort through the whole database
@@ -593,7 +593,7 @@ sub save_comment {
     if ($props && %$props) {
         my @propnames;
         while (my ($name, $value) = each %$props) {
-            $bak{"comment:prop:$data->{id}:$name"} = $value;
+            $bak{"comment:prop:$data->{id}:$name"} = encode('utf-8', $value);
             push @propnames, $name;
         }
         $bak{"comment:proplist:$data->{id}"} = join q{,}, @propnames;
