@@ -545,7 +545,7 @@ sub save_event {
     }
     my @props;
     while (my ($p, $v) = each %{$data->{props} || {}}) {
-        $bak{"event:prop:$id:$p"} = $v;
+        $bak{"event:prop:$id:$p"} = encode('utf-8', $v);
         push @props, $p;
     }
     $bak{"event:proplist:$id"} = join ',', @props; # so we don't have to sort through the whole database
@@ -593,7 +593,7 @@ sub save_comment {
     if ($props && %$props) {
         my @propnames;
         while (my ($name, $value) = each %$props) {
-            $bak{"comment:prop:$data->{id}:$name"} = $value;
+            $bak{"comment:prop:$data->{id}:$name"} = encode('utf-8', $value);
             push @propnames, $name;
         }
         $bak{"comment:proplist:$data->{id}"} = join q{,}, @propnames;
@@ -987,7 +987,7 @@ sub dump_html {
                 my $ditemid = $data->{id} * 256 + $anum;
                 my $commentlink = "$link?thread=$ditemid#t$ditemid";
                 $ret .= $data->{posterid} ?
-                        "<a href='$commentlink'>Comment</a> by <a href='http://$opts{server}/userinfo.bml?user=$users->{$data->{posterid}}'>$users->{$data->{posterid}}</a> " :
+                        "<a href='$commentlink'>Comment</a> by <a href='http://$opts{server}/userinfo.bml?user=$users->{$data->{posterid}}->{name}'>$users->{$data->{posterid}}->{name}</a> " :
                         "<a href='$commentlink'>Anonymous comment</a> ";
                 $ret .= "on $data->{date}<br />\n";
                 $data->{subject} = $opts{clean} ? clean_subject($data->{subject}) : ehtml($data->{subject});
@@ -1016,7 +1016,7 @@ sub dump_html {
         my $link = "http://$opts{server}/users/$opts{linkuser}/$itemid.html";
         $evt->{subject} = $opts{clean} ? clean_subject($evt->{subject}) : ehtml($evt->{subject});
         $ret .= "<b>$evt->{subject}</b>" if $evt->{subject};
-        my $altposter = $evt->{poster} ? " (posted by $evt->{poster})" : "";
+        my $altposter = $evt->{poster} ? " (posted by <a href='http://$opts{server}/userinfo.bml?user=$evt->{poster}'>$evt->{poster}</a>)" : "";
         $ret .= "$altposter<br />\n";
         $ret .= "<a href='$link'>$evt->{eventtime}</a><br /><br />\n";
         $evt->{event} = $opts{clean} ? clean_event($evt->{event}) : ehtml($evt->{event});
@@ -1076,7 +1076,8 @@ sub dump_xml {
             if ($props && %$props) {
                 $res .= "\t\t\t\t\t<props>\n";
                 while (my ($name, $value) = each %$props) {
-                    $res .= "\t\t\t\t\t\t<prop name='$name'>$value</prop>\n";
+                    my $cleanval = exml($value);
+                    $res .= "\t\t\t\t\t\t<prop name='$name'>$cleanval</prop>\n";
                 }
                 $res .= "\t\t\t\t\t</props>\n";
             }
@@ -1137,7 +1138,7 @@ sub dump_xml {
     for my $friend (values %$friends) {
         $ret .= "\t\t<friend>\n";
         for my $field (qw( username fullname type identity_type identity_value identity_display fgcolor bgcolor birthday groupmask )) {
-            $ret .= "\t\t\t<$field>" . $friend->{$field} . "</$field>\n"
+            $ret .= "\t\t\t<$field>" . exml($friend->{$field}) . "</$field>\n"
                 if $friend->{$field};
         }
         my $groups = $friend->{groups};
@@ -1153,7 +1154,7 @@ sub dump_xml {
     for my $group (values %$friendgroups) {
         $ret .= "\t\t<group>\n";
         $ret .= "\t\t\t<id>$group->{id}</id>\n";
-        $ret .= "\t\t\t<name>$group->{name}</name>\n";
+        $ret .= "\t\t\t<name>" . exml($group->{name}) . "</name>\n";
         $ret .= "\t\t\t<sortorder>$group->{sortorder}</sortorder>\n";
         $ret .= "\t\t\t<public>$group->{public}</public>\n" if $group->{public};
         $ret .= "\t\t</group>\n";
